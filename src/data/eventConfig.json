@@ -1,0 +1,23 @@
+{
+  "clienteId": "demo-001",
+  "quinceanera": {
+    "nombre": "Valentina",
+    "frase": "Hay momentos inolvidables que se atesoran en el corazón para siempre...",
+    "fechaEvento": "2026-11-20T21:00:00",
+    "coloresPrincipales": ["#d4af37", "#000000"]
+  },
+  "ubicacion": {
+    "salon": "Salón Estrellas - Colegiales, CABA",
+    "direccion": "Av. Federico Lacroze 1234",
+    "mapaUrl": "https://maps.google.com/..."
+  },
+  "regalos": {
+    "cbu": "0000003100000000000000",
+    "alias": "valen.mis15",
+    "banco": "Banco Galicia - Titular: Saúl (Padre)"
+  },
+  "rsvp": {
+    "fechaLimite": "2026-11-01",
+    "telefonoWhatsapp": "5491123456789"
+  }
+}

@@ -1,0 +1,38 @@
+name: CI - Quality & Build Check
+
+# Se activa cuando subís cambios o abrís un Pull Request hacia main o staging
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  build_and_test:
+    name: Linter & Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Descarga el código del repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Instala Node.js en el servidor virtual
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # 3. Instala las dependencias exactas del package-lock.json
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Ejecuta el Linter (si tenés configurado ESLint/Oxlint en package.json)
+      # Si aún no tenés el script "lint" en package.json, podés comentar estas 2 líneas
+      - name: Run Linter
+        run: npm run lint --if-present
+
+      # 5. Prueba que la app compile para producción sin romperse
+      - name: Build project
+        run: npm run build

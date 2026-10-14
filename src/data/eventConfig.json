@@ -1,9 +1,9 @@
 {
   "clienteId": "demo-001",
   "quinceanera": {
-    "nombre": "Valentina",
+    "nombre": "Milagraos",
     "frase": "Hay momentos inolvidables que se atesoran en el corazón para siempre...",
-    "fechaEvento": "2026-11-20T21:00:00",
+    "fechaEvento": "2026-12-15T21:00:00",
     "coloresPrincipales": ["#d4af37", "#000000"]
   },
   "ubicacion": {

@@ -1,13 +1,13 @@
 {
   "clienteId": "demo-001",
   "quinceanera": {
-    "nombre": "Milagraos",
+    "nombre": "Milagros",
     "frase": "Hay momentos inolvidables que se atesoran en el corazón para siempre...",
     "fechaEvento": "2026-12-15T21:00:00",
     "coloresPrincipales": ["#d4af37", "#000000"]
   },
   "ubicacion": {
-    "salon": "Salón Estrellas - Colegiales, CABA",
+    "salon": "Salón Estrellas - Monte Grande, 9 de Abril",
     "direccion": "Av. Federico Lacroze 1234",
     "mapaUrl": "https://maps.google.com/..."
   },

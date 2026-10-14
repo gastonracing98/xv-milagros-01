@@ -3,11 +3,11 @@
   "quinceanera": {
     "nombre": "Milagros",
     "frase": "Hay momentos inolvidables que se atesoran en el corazón para siempre...",
-    "fechaEvento": "2026-11-20T21:00:00z",
+    "fechaEvento": "2026-12-04T23:30:00z",
     "coloresPrincipales": ["#d4af37", "#000000"]
   },
   "ubicacion": {
-    "salon": "Salón Estrellas - Monte Grande, 9 de Abril",
+    "salon": "Salón Vecionos de Alem - Monte Grande, 9 de Abril",
     "direccion": "Av. Federico Lacroze 1234",
     "mapaUrl": "https://maps.google.com/..."
   },
@@ -17,7 +17,7 @@
     "banco": "Banco Galicia - Titular: Saúl (Padre)"
   },
   "rsvp": {
-    "fechaLimite": "2026-11-01",
+    "fechaLimite": "2026-12-04",
     "telefonoWhatsapp": "5491123456789"
   }
 }

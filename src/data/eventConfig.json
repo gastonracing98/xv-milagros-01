@@ -9,7 +9,7 @@
     "fechaEvento": "2026-12-05T23:30:00Z",
     "fechaVisual": {
       "diaSemana": "SÁBADO",
-      "diaNumero": "05",
+      "diaNumero": "04",
       "mes": "DICIEMBRE",
       "anio": "2026"
     }
@@ -21,10 +21,10 @@
     "duracionTexto": "3:52"
   },
   "ubicacion": {
-    "horarioYLugar": "20:30HS - JANO'S LA REJA",
-    "direccion": "Av. Francisco Piovano 4500, La Reja, Buenos Aires",
+    "horarioYLugar": "19:30HS - Vecinos de Alem",
+    "direccion": "Valentín Alsina 60, Monte Grande",
     "mapaUrl": "https://maps.google.com/?q=Janos+La+Reja",
-    "iframeEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3282.495232854587!2d-58.8351!3d-34.6421!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzTCsDM4JzMxLjYiUyA1OMKwNTAnMDYuNCJX!5e0!3m2!1ses-419!2sar!4v1700000000000!5m2!1ses-419!2sar"
+    "iframeEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1299.316902974698!2d-58.46386243945019!3d-34.824094598212426!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x95bcd15f5dd4d6ab%3A0x1a6bfd968beab226!2sSociedad%20Vecinos%20de%20Alem!5e0!3m2!1ses-419!2sar!4v1793447362790!5m2!1ses-419!2sar"
   },
   "cronograma": [
     {

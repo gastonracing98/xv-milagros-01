@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart } from 'lucide-react';
 import config from '../data/eventConfig.json';
+import foto from '../../public/foto15.jpg'
 
 export default function Hero() {
   const { nombre, subtitulo, frase, fotoHero, fechaVisual } = config.quinceanera;
@@ -41,7 +42,7 @@ export default function Hero() {
           src={fotoHero}
           alt={nombre}
           onError={(e) => {
-            e.target.src = "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80";
+            e.target.src = foto;
           }}
           className="w-full h-full object-cover object-top"
         />

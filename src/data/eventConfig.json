@@ -1,23 +1,70 @@
 {
-  "clienteId": "demo-001",
+  "clienteId": "xv-milagros-01",
   "quinceanera": {
-    "nombre": "Milagros",
-    "frase": "Hay momentos inolvidables que se atesoran en el corazón para siempre...",
-    "fechaEvento": "2026-12-04T23:30:00z",
-    "coloresPrincipales": ["#d4af37", "#000000"]
+    "nombre": "MILAGROS",
+    "subtitulo": "¡MIS 15 AÑOS!",
+    "padres": ["Nombre del Padre", "Nombre de la Madre"],
+    "frase": "Los esperamos para celebrar juntos esta noche mágica",
+    "fotoHero": "/quince-hero.jpg",
+    "fechaEvento": "2026-12-05T23:30:00Z",
+    "fechaVisual": {
+      "diaSemana": "SÁBADO",
+      "diaNumero": "04",
+      "mes": "DICIEMBRE",
+      "anio": "2026"
+    }
+  },
+  "musica": {
+    "titulo": "Better Together",
+    "artista": "Jack Johnson",
+    "audioUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    "duracionTexto": "3:52"
   },
   "ubicacion": {
-    "salon": "Salón Vecionos de Alem - Monte Grande, 9 de Abril",
-    "direccion": "Av. Federico Lacroze 1234",
-    "mapaUrl": "https://maps.google.com/..."
+    "horarioYLugar": "19:30HS - Vecinos de Alem",
+    "direccion": "Valentín Alsina 60, Monte Grande",
+    "mapaUrl": "https://maps.google.com/?q=Janos+La+Reja",
+    "iframeEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1299.316902974698!2d-58.46386243945019!3d-34.824094598212426!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x95bcd15f5dd4d6ab%3A0x1a6bfd968beab226!2sSociedad%20Vecinos%20de%20Alem!5e0!3m2!1ses-419!2sar!4v1793447362790!5m2!1ses-419!2sar"
   },
-  "regalos": {
-    "cbu": "0000003100000000000000",
-    "alias": "valen.mis15",
-    "banco": "Banco Galicia - Titular: Saúl (Padre)"
-  },
+  "cronograma": [
+    {
+      "hora": "20:30 HS",
+      "titulo": "RECEPCIÓN",
+      "descripcion": "Bienvenida y cóctel en los jardines del salón",
+      "icono": "sparkles"
+    },
+    {
+      "hora": "21:30 HS",
+      "titulo": "ENTRADA PRINCIPAL",
+      "descripcion": "Comienzo de una noche inolvidable",
+      "icono": "crown"
+    },
+    {
+      "hora": "22:00 HS",
+      "titulo": "CENA Y BRINDIS",
+      "descripcion": "Compartimos una deliciosa cena y palabras especiales",
+      "icono": "utensils"
+    },
+    {
+      "hora": "23:15 HS",
+      "titulo": "EL VALS",
+      "descripcion": "El primer baile tradicional con familia y amigos",
+      "icono": "music"
+    },
+    {
+      "hora": "00:00 HS",
+      "titulo": "FIESTA Y BAILE",
+      "descripcion": "¡A brillar en la pista toda la noche!",
+      "icono": "disc"
+    },
+    {
+      "hora": "04:30 HS",
+      "titulo": "FIN DE FIESTA",
+      "descripcion": "Despedida y desayuno",
+      "icono": "star"
+    }
+  ],
   "rsvp": {
-    "fechaLimite": "2026-12-04",
-    "telefonoWhatsapp": "5491123456789"
+    "recordatorio": "RECORDÁ COMPLETAR UN FORMULARIO POR PERSONA. HACELO ANTES DEL 20 DE NOVIEMBRE."
   }
 }

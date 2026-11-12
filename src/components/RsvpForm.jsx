@@ -1,26 +1,219 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import config from '../data/eventConfig.json';
+import {
+  addDoc,
+  collection,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore';
+import { db } from '../services/firebase';
+import InlineError from './InlineError';
+import { trackPageVisit, trackSubmitClick, trackConversion } from '../services/analytics';
+import { notifyNewRsvp } from '../services/notifications';
+import { generateInvitationPdf } from '../services/pdfGenerator';
+import { Download, CheckCircle2, Sparkles } from 'lucide-react';
+
+const OPCIONES_DIETA = [
+  { value: 'Ninguno (Menú general)', label: 'Ninguno (Menú general)' },
+  { value: 'Vegetariano', label: 'Vegetariano' },
+  { value: 'Vegano', label: 'Vegano' },
+  { value: 'Celíaco (Sin TACC)', label: 'Celíaco (Sin TACC)' },
+  { value: 'Sin lactosa', label: 'Intolerante a la lactosa' }
+];
+
+// 1. Limpia etiquetas HTML, caracteres de inyección y espacios múltiples
+const sanitizeText = (str = '') =>
+  str
+    .replace(/<[^>]*>?/gm, '') // Remueve tags HTML
+    .replace(/[<>/{}[\]\\^~`]/g, '') // Remueve caracteres peligrosos
+    .trim()
+    .replace(/\s+/g, ' ');
+
+// 2. Normaliza nombres a formato "Juan Perez"
+const normalizeName = (str = '') =>
+  sanitizeText(str)
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (letra) => letra.toUpperCase());
 
 export default function RsvpForm() {
   const [formData, setFormData] = useState({
     asiste: 'si',
     nombre: '',
     apellido: '',
-    dieta: '',
-    cancion: ''
+    dieta: OPCIONES_DIETA[0].value,
+    cancion: '',
+    mensaje: '',
+    website_hp: '' // Campo Honeypot oculto para atrapar bots
   });
+
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  const [guestRegistered, setGuestRegistered] = useState(null);
+
+  const nombreQuinceanera = config?.quinceanera?.nombre || 'la quinceañera';
+
+  useEffect(() => {
+    trackPageVisit();
+  }, []);
+
+  const validateField = (name, value) => {
+    const cleanValue = value.trim().replace(/\s+/g, ' ');
+    const regexLetras = /^[A-Za-zÁÉÍÓÚáéíóúÜüÑñ\s']+$/;
+    const regexCaracteresPeligrosos = /[<>/{}[\]\\^~`]/;
+
+    switch (name) {
+      case 'nombre':
+        if (!cleanValue) return 'El nombre es obligatorio.';
+        if (cleanValue.length < 3) return 'El nombre debe tener al menos 3 caracteres.';
+        if (cleanValue.length > 50) return 'El nombre no puede superar los 50 caracteres.';
+        if (!regexLetras.test(cleanValue)) return 'El nombre solo puede contener letras y espacios.';
+        return '';
+
+      case 'apellido':
+        if (!cleanValue) return 'El apellido es obligatorio.';
+        if (cleanValue.length < 2) return 'El apellido debe tener al menos 2 caracteres.';
+        if (cleanValue.length > 50) return 'El apellido no puede superar los 50 caracteres.';
+        if (!regexLetras.test(cleanValue)) return 'El apellido solo puede contener letras y espacios.';
+        return '';
+
+      case 'dieta':
+        if (!OPCIONES_DIETA.some((op) => op.value === value)) {
+          return 'Seleccioná una opción válida del menú.';
+        }
+        return '';
+
+      case 'cancion':
+        if (!cleanValue) return '';
+        if (cleanValue.length < 2) return 'El nombre de la canción es demasiado corto.';
+        if (cleanValue.length > 120) return 'Máximo 120 caracteres para la recomendación.';
+        if (regexCaracteresPeligrosos.test(cleanValue)) return 'El texto contiene caracteres no permitidos.';
+        return '';
+
+      case 'mensaje':
+        if (!cleanValue) return '';
+        if (cleanValue.length < 3) return 'El mensaje es demasiado corto.';
+        if (cleanValue.length > 300) return 'El mensaje no puede superar los 300 caracteres.';
+        if (regexCaracteresPeligrosos.test(cleanValue)) return 'El mensaje contiene símbolos no permitidos (<, >, {, }).';
+        return '';
+
+      default:
+        return '';
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    ['nombre', 'apellido', 'dieta', 'cancion', 'mensaje'].forEach((field) => {
+      const errorMsg = validateField(field, formData[field]);
+      if (errorMsg) newErrors[field] = errorMsg;
+    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (errors[name] || errors.general) {
+      setErrors((prev) => ({ ...prev, [name]: '', general: '' }));
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    const errorMsg = validateField(name, value);
+    if (errorMsg) setErrors((prev) => ({ ...prev, [name]: errorMsg }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Cuando actives Firebase, aquí descomentarás addDoc(collection(db, "invitados"), formData)
-    console.log("Datos listos para guardar en DB:", formData);
-    setEnviado(true);
+
+    // Bloqueo silencioso si un bot completó el campo oculto
+    if (formData.website_hp) {
+      return;
+    }
+
+    trackSubmitClick(formData.asiste);
+
+    if (!validateForm()) return;
+
+    setLoading(true);
+    setErrors({});
+
+    const nombreNormalizado = normalizeName(formData.nombre);
+    const apellidoNormalizado = normalizeName(formData.apellido);
+    const cancionSanitizada = sanitizeText(formData.cancion);
+    const mensajeSanitizado = sanitizeText(formData.mensaje);
+
+    try {
+      const q = query(
+        collection(db, 'invitados'),
+        where('nombre', '==', nombreNormalizado),
+        where('apellido', '==', apellidoNormalizado)
+      );
+
+      const resultado = await getDocs(q);
+
+      if (!resultado.empty) {
+        setErrors({
+          general: `Ya existe una confirmación registrada para ${nombreNormalizado} ${apellidoNormalizado}.`
+        });
+        setLoading(false);
+        return;
+      }
+
+      const nuevoInvitado = {
+        asiste: formData.asiste,
+        nombre: nombreNormalizado,
+        apellido: apellidoNormalizado,
+        dieta: formData.asiste === 'si' ? formData.dieta : 'No aplica',
+        cancion: formData.asiste === 'si' ? cancionSanitizada : '',
+        mensaje: mensajeSanitizado,
+        createdAt: new Date()
+      };
+
+      const docRef = await addDoc(collection(db, 'invitados'), nuevoInvitado);
+
+      const datosParaPdf = {
+        ...nuevoInvitado,
+        idCorto: docRef.id.slice(0, 6).toUpperCase()
+      };
+
+      trackConversion('confirmacionesExitosas', {
+        invitado: `${nombreNormalizado} ${apellidoNormalizado}`,
+        asiste: formData.asiste
+      });
+      notifyNewRsvp(datosParaPdf);
+
+      setGuestRegistered(datosParaPdf);
+      setEnviado(true);
+    } catch (err) {
+      console.error('Error al guardar en Firebase:', err);
+      setErrors({
+        general: 'No pudimos guardar tu confirmación en este momento. Revisá tu conexión e intentá nuevamente.'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!guestRegistered) return;
+    generateInvitationPdf(guestRegistered);
+    trackConversion('descargasPdf', {
+      invitado: `${guestRegistered.nombre} ${guestRegistered.apellido}`
+    });
+  };
+
+  const getInputClass = (fieldName) => {
+    const base =
+      'w-full p-4 bg-tiana-pearl border rounded-md text-tiana-brown placeholder-tiana-brown/50 focus:outline-none transition-colors';
+    return errors[fieldName]
+      ? `${base} border-red-500 bg-red-50/30 focus:border-red-600`
+      : `${base} border-tiana-beige focus:border-tiana-primary`;
   };
 
   return (
@@ -30,27 +223,72 @@ export default function RsvpForm() {
           Sólo faltas vos, ¿Venís?
         </h2>
 
+        <InlineError message={errors.general} variant="banner" />
+
         {enviado ? (
-          <div className="p-8 bg-tiana-pearl rounded-2xl border border-tiana-gold/40 shadow-sm">
-            <h3 className="text-xl font-serif font-semibold text-tiana-dark mb-2">
-              ¡Gracias por confirmar!
+          <div className="p-8 bg-tiana-pearl rounded-2xl border border-tiana-gold/40 shadow-sm space-y-4">
+            <div className="w-12 h-12 rounded-full bg-tiana-mint/50 text-tiana-dark flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+
+            <h3 className="text-xl font-serif font-semibold text-tiana-dark">
+              ¡Gracias por confirmar, {guestRegistered?.nombre}!
             </h3>
-            <p className="text-sm text-tiana-brown">
-              Tus datos fueron registrados correctamente.
+
+            <p className="text-sm text-tiana-brown leading-relaxed">
+              {guestRegistered?.asiste === 'si'
+                ? 'Tus datos y tu mensaje fueron registrados. Ya podés descargar tu tarjeta personal con toda la información del evento.'
+                : 'Registramos tu respuesta y tu mensaje para la cumpleañera. ¡Gracias por avisarnos!'}
             </p>
+
+            {guestRegistered?.asiste === 'si' && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  className="w-full py-3.5 px-6 rounded-full bg-tiana-dark hover:bg-tiana-primary text-tiana-pearl font-semibold tracking-[0.15em] uppercase text-xs md:text-sm shadow-md transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar Tarjeta Personal (PDF)
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => {
                 setEnviado(false);
-                setFormData({ asiste: 'si', nombre: '', apellido: '', dieta: '', cancion: '' });
+                setGuestRegistered(null);
+                setErrors({});
+                setFormData({
+                  asiste: 'si',
+                  nombre: '',
+                  apellido: '',
+                  dieta: OPCIONES_DIETA[0].value,
+                  cancion: '',
+                  mensaje: '',
+                  website_hp: ''
+                });
               }}
-              className="mt-6 text-xs uppercase tracking-widest text-tiana-dark underline font-semibold"
+              className="block w-full pt-4 text-xs uppercase tracking-widest text-tiana-brown/80 hover:text-tiana-dark underline font-semibold"
             >
               Cargar otra persona
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4 text-left">
+            {/* Honeypot invisible anti-bots */}
+            <input
+              type="text"
+              name="website_hp"
+              value={formData.website_hp}
+              onChange={handleChange}
+              tabIndex="-1"
+              autoComplete="off"
+              className="hidden"
+              aria-hidden="true"
+            />
+
             {/* Radio Buttons: Sí / No */}
             <div className="flex items-center justify-center gap-12 mb-6">
               <label className="flex items-center gap-3 cursor-pointer text-lg font-medium text-tiana-brown">
@@ -78,57 +316,128 @@ export default function RsvpForm() {
               </label>
             </div>
 
-            {/* Inputs de texto */}
-            <input
-              type="text"
-              name="nombre"
-              required
-              placeholder="Nombre"
-              value={formData.nombre}
-              onChange={handleChange}
-              className="w-full p-4 bg-tiana-pearl border border-tiana-beige rounded-md text-tiana-brown placeholder-tiana-brown/50 focus:outline-none focus:border-tiana-primary"
-            />
+            {/* Campo: Nombre */}
+            <div>
+              <label htmlFor="nombre" className="block text-sm font-medium text-tiana-brown mb-1">
+                Nombre <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="nombre"
+                type="text"
+                name="nombre"
+                maxLength={50}
+                placeholder="Nombre completo"
+                value={formData.nombre}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className={getInputClass('nombre')}
+              />
+              <InlineError message={errors.nombre} />
+            </div>
 
-            <input
-              type="text"
-              name="apellido"
-              required
-              placeholder="Apellido"
-              value={formData.apellido}
-              onChange={handleChange}
-              className="w-full p-4 bg-tiana-pearl border border-tiana-beige rounded-md text-tiana-brown placeholder-tiana-brown/50 focus:outline-none focus:border-tiana-primary"
-            />
+            {/* Campo: Apellido */}
+            <div>
+              <label htmlFor="apellido" className="block text-sm font-medium text-tiana-brown mb-1">
+                Apellido <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="apellido"
+                type="text"
+                name="apellido"
+                maxLength={50}
+                placeholder="Gutierrez"
+                value={formData.apellido}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className={getInputClass('apellido')}
+              />
+              <InlineError message={errors.apellido} />
+            </div>
 
-            <input
-              type="text"
-              name="dieta"
-              placeholder="Vegano / vegetariano / celíaco / nada"
-              value={formData.dieta}
-              onChange={handleChange}
-              className="w-full p-4 bg-tiana-pearl border border-tiana-beige rounded-md text-tiana-brown placeholder-tiana-brown/50 focus:outline-none focus:border-tiana-primary"
-            />
+            {/* Campo: Menú Especial */}
+            <div>
+              <label htmlFor="dieta" className="block text-sm font-medium text-tiana-brown mb-1">
+                Menú especial
+              </label>
+              <select
+                id="dieta"
+                name="dieta"
+                value={formData.dieta}
+                onChange={handleChange}
+                className={`${getInputClass('dieta')} cursor-pointer`}
+              >
+                {OPCIONES_DIETA.map((opcion) => (
+                  <option key={opcion.value} value={opcion.value}>
+                    {opcion.label}
+                  </option>
+                ))}
+              </select>
+              <InlineError message={errors.dieta} />
+            </div>
 
-            <textarea
-              name="cancion"
-              rows="3"
-              placeholder="Recomendale una canción al DJ 🎶"
-              value={formData.cancion}
-              onChange={handleChange}
-              className="w-full p-4 bg-tiana-pearl border border-tiana-beige rounded-md text-tiana-brown placeholder-tiana-brown/50 focus:outline-none focus:border-tiana-primary resize-none"
-            />
+            {/* Campo: Recomendación al DJ */}
+            <div>
+              <label htmlFor="cancion" className="block text-sm font-medium text-tiana-brown mb-1">
+                Recomendación al DJ
+              </label>
+              <input
+                id="cancion"
+                type="text"
+                name="cancion"
+                maxLength={120}
+                placeholder="Recomendale una canción al DJ 🎶"
+                value={formData.cancion}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className={getInputClass('cancion')}
+              />
+              <InlineError message={errors.cancion} />
+            </div>
+
+            {/* Nuevo Apartado: Mensaje especial para la quinceañera */}
+            <div className="pt-2">
+              <div className="p-4 rounded-xl bg-tiana-mint/25 border border-tiana-gold/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="mensaje" className="text-sm font-semibold text-tiana-dark flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-tiana-gold" />
+                    Dejale un mensaje a {nombreQuinceanera}
+                  </label>
+                  <span className="text-[11px] text-tiana-brown/60 font-mono">
+                    {formData.mensaje.length}/300
+                  </span>
+                </div>
+
+                <p className="text-xs text-tiana-brown/80 leading-relaxed">
+                  Escribile unas palabras o buenos deseos para su noche especial. <strong>¡Ella lo va a leer personalmente!</strong>
+                </p>
+
+                <textarea
+                  id="mensaje"
+                  name="mensaje"
+                  rows="3"
+                  maxLength={300}
+                  placeholder={`Ej: ¡Felices 15, ${nombreQuinceanera}! Qué alegría acompañarte en esta noche...`}
+                  value={formData.mensaje}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className={`${getInputClass('mensaje')} resize-none mt-1`}
+                />
+                <InlineError message={errors.mensaje} />
+              </div>
+            </div>
 
             {/* Botón Enviar */}
-            <div className="pt-2">
+            <div className="pt-3">
               <button
                 type="submit"
-                className="w-full py-3.5 px-8 rounded-full bg-tiana-primary hover:bg-tiana-dark text-tiana-pearl font-semibold tracking-[0.2em] uppercase text-base shadow-md transition-colors"
+                disabled={loading}
+                className="w-full py-3.5 px-8 rounded-full bg-tiana-primary hover:bg-tiana-dark disabled:opacity-50 text-tiana-pearl font-semibold tracking-[0.2em] uppercase text-base shadow-md transition-colors"
               >
-                ENVIAR
+                {loading ? 'ENVIANDO...' : 'ENVIAR'}
               </button>
             </div>
 
-            {/* Nota al pie */}
-            <p className="pt-4 text-[11px] md:text-xs tracking-[0.12em] uppercase text-tiana-brown/80 leading-relaxed font-medium">
+            <p className="pt-4 text-center text-[11px] md:text-xs tracking-[0.12em] uppercase text-tiana-brown/80 leading-relaxed font-medium">
               {config.rsvp.recordatorio}
             </p>
           </form>

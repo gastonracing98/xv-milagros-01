@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sparkles, Crown, Utensils, Music, Disc, Star } from 'lucide-react';
 import config from '../data/eventConfig.json';
+import FloralDecor from './FloralDecor';
 
 const iconMap = {
   sparkles: Sparkles,
@@ -8,18 +9,25 @@ const iconMap = {
   utensils: Utensils,
   music: Music,
   disc: Disc,
-  star: Star,
+  star: Star
 };
 
 export default function Timeline() {
   const items = config.cronograma;
 
   return (
-    <section className="py-16 px-6 bg-tiana-dark text-tiana-pearl">
-      <div className="max-w-md mx-auto">
-        <h2 className="text-center font-serif text-2xl md:text-3xl tracking-[0.2em] uppercase text-tiana-cream mb-12">
-          Cronograma
-        </h2>
+    <section className="relative py-20 px-6 bg-tiana-dark text-tiana-pearl overflow-hidden">
+      {/* Flores en los costados izquierdo y derecho (Captura 4) */}
+      <FloralDecor variant="side-vines" />
+
+      <div className="relative z-10 max-w-md mx-auto">
+        <div className="flex items-center justify-center gap-3 mb-12">
+          <span className="h-[1px] w-8 bg-tiana-gold/60" />
+          <h2 className="text-center font-serif text-2xl md:text-3xl tracking-[0.2em] uppercase text-tiana-cream">
+            Cronograma
+          </h2>
+          <span className="h-[1px] w-8 bg-tiana-gold/60" />
+        </div>
 
         <div className="relative">
           {/* Línea vertical continua */}
@@ -35,7 +43,7 @@ export default function Timeline() {
                     <IconComponent className="w-7 h-7 stroke-[1.5]" />
                   </div>
 
-                  {/* Punto dorado intermedio en la línea */}
+                  {/* Punto dorado intermedio */}
                   {index < items.length - 1 && (
                     <div className="absolute left-8 -bottom-6 w-2.5 h-2.5 rounded-full bg-tiana-gold -translate-x-1/2 z-10" />
                   )}

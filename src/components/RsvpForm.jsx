@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import InlineError from './InlineError';
+import FloralDecor from './FloralDecor';
 import { trackPageVisit, trackSubmitClick, trackConversion } from '../services/analytics';
 import { notifyNewRsvp } from '../services/notifications';
 import { generateInvitationPdf } from '../services/pdfGenerator';
@@ -22,15 +23,13 @@ const OPCIONES_DIETA = [
   { value: 'Sin lactosa', label: 'Intolerante a la lactosa' }
 ];
 
-// 1. Limpia etiquetas HTML, caracteres de inyección y espacios múltiples
 const sanitizeText = (str = '') =>
   str
-    .replace(/<[^>]*>?/gm, '') // Remueve tags HTML
-    .replace(/[<>/{}[\]\\^~`]/g, '') // Remueve caracteres peligrosos
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/[<>/{}[\]\\^~`]/g, '')
     .trim()
     .replace(/\s+/g, ' ');
 
-// 2. Normaliza nombres a formato "Juan Perez"
 const normalizeName = (str = '') =>
   sanitizeText(str)
     .toLowerCase()
@@ -44,7 +43,7 @@ export default function RsvpForm() {
     dieta: OPCIONES_DIETA[0].value,
     cancion: '',
     mensaje: '',
-    website_hp: '' // Campo Honeypot oculto para atrapar bots
+    website_hp: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -53,6 +52,7 @@ export default function RsvpForm() {
   const [guestRegistered, setGuestRegistered] = useState(null);
 
   const nombreQuinceanera = config?.quinceanera?.nombre || 'la quinceañera';
+  const asisteAlEvento = formData.asiste === 'si';
 
   useEffect(() => {
     trackPageVisit();
@@ -79,13 +79,14 @@ export default function RsvpForm() {
         return '';
 
       case 'dieta':
+        if (!asisteAlEvento) return ''; // No validar si no asiste
         if (!OPCIONES_DIETA.some((op) => op.value === value)) {
           return 'Seleccioná una opción válida del menú.';
         }
         return '';
 
       case 'cancion':
-        if (!cleanValue) return '';
+        if (!asisteAlEvento || !cleanValue) return ''; // No validar si no asiste o está vacío
         if (cleanValue.length < 2) return 'El nombre de la canción es demasiado corto.';
         if (cleanValue.length > 120) return 'Máximo 120 caracteres para la recomendación.';
         if (regexCaracteresPeligrosos.test(cleanValue)) return 'El texto contiene caracteres no permitidos.';
@@ -95,7 +96,7 @@ export default function RsvpForm() {
         if (!cleanValue) return '';
         if (cleanValue.length < 3) return 'El mensaje es demasiado corto.';
         if (cleanValue.length > 300) return 'El mensaje no puede superar los 300 caracteres.';
-        if (regexCaracteresPeligrosos.test(cleanValue)) return 'El mensaje contiene símbolos no permitidos (<, >, {, }).';
+        if (regexCaracteresPeligrosos.test(cleanValue)) return 'El mensaje contiene símbolos no permitidos.';
         return '';
 
       default:
@@ -105,10 +106,16 @@ export default function RsvpForm() {
 
   const validateForm = () => {
     const newErrors = {};
-    ['nombre', 'apellido', 'dieta', 'cancion', 'mensaje'].forEach((field) => {
+    // Si elige "no", solo validamos nombre, apellido y mensaje
+    const fieldsToValidate = asisteAlEvento
+      ? ['nombre', 'apellido', 'dieta', 'cancion', 'mensaje']
+      : ['nombre', 'apellido', 'mensaje'];
+
+    fieldsToValidate.forEach((field) => {
       const errorMsg = validateField(field, formData[field]);
       if (errorMsg) newErrors[field] = errorMsg;
     });
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -117,7 +124,10 @@ export default function RsvpForm() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (errors[name] || errors.general) {
+    // Si cambia a "no", limpiamos posibles errores previos en dieta y canción
+    if (name === 'asiste' && value === 'no') {
+      setErrors((prev) => ({ ...prev, dieta: '', cancion: '', general: '' }));
+    } else if (errors[name] || errors.general) {
       setErrors((prev) => ({ ...prev, [name]: '', general: '' }));
     }
   };
@@ -131,12 +141,9 @@ export default function RsvpForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Bloqueo silencioso si un bot completó el campo oculto
-    if (formData.website_hp) {
-      return;
-    }
+    if (formData.website_hp) return;
 
-    trackSubmitClick(formData.asiste);
+    trackSubmitClick(formData.asiste, formData.nombre);
 
     if (!validateForm()) return;
 
@@ -165,13 +172,14 @@ export default function RsvpForm() {
         return;
       }
 
+      // Strings genéricos por defecto cuando elige "no" para compatibilidad total con Firebase
       const nuevoInvitado = {
         asiste: formData.asiste,
         nombre: nombreNormalizado,
         apellido: apellidoNormalizado,
-        dieta: formData.asiste === 'si' ? formData.dieta : 'No aplica',
-        cancion: formData.asiste === 'si' ? cancionSanitizada : '',
-        mensaje: mensajeSanitizado,
+        dieta: asisteAlEvento ? formData.dieta : 'No aplica (No asiste)',
+        cancion: asisteAlEvento ? (cancionSanitizada || 'Sin especificar') : 'No aplica',
+        mensaje: mensajeSanitizado || 'Sin mensaje',
         createdAt: new Date()
       };
 
@@ -200,9 +208,9 @@ export default function RsvpForm() {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!guestRegistered) return;
-    generateInvitationPdf(guestRegistered);
+    await generateInvitationPdf(guestRegistered);
     trackConversion('descargasPdf', {
       invitado: `${guestRegistered.nombre} ${guestRegistered.apellido}`
     });
@@ -217,8 +225,11 @@ export default function RsvpForm() {
   };
 
   return (
-    <section className="py-16 px-6 bg-tiana-cream text-tiana-brown">
-      <div className="max-w-md mx-auto text-center">
+    <section className="relative py-16 px-6 bg-tiana-cream text-tiana-brown overflow-hidden">
+      <div className="max-w-md mx-auto text-center relative z-10">
+        {/* Arco Floral Superior (Inspirado en la captura 5) */}
+        <FloralDecor variant="form-arch" />
+
         <h2 className="text-2xl md:text-3xl font-serif font-semibold text-tiana-brown mb-8 tracking-wide">
           Sólo faltas vos, ¿Venís?
         </h2>
@@ -232,13 +243,13 @@ export default function RsvpForm() {
             </div>
 
             <h3 className="text-xl font-serif font-semibold text-tiana-dark">
-              ¡Gracias por confirmar, {guestRegistered?.nombre}!
+              ¡Gracias por responder, {guestRegistered?.nombre}!
             </h3>
 
             <p className="text-sm text-tiana-brown leading-relaxed">
               {guestRegistered?.asiste === 'si'
-                ? 'Tus datos y tu mensaje fueron registrados. Ya podés descargar tu tarjeta personal con toda la información del evento.'
-                : 'Registramos tu respuesta y tu mensaje para la cumpleañera. ¡Gracias por avisarnos!'}
+                ? 'Tus datos fueron registrados. Descargá tu tarjeta personal con marco floral para el ingreso al salón.'
+                : 'Registramos que no podrás asistir. ¡Muchas gracias por avisarnos y por tus palabras!'}
             </p>
 
             {guestRegistered?.asiste === 'si' && (
@@ -249,7 +260,7 @@ export default function RsvpForm() {
                   className="w-full py-3.5 px-6 rounded-full bg-tiana-dark hover:bg-tiana-primary text-tiana-pearl font-semibold tracking-[0.15em] uppercase text-xs md:text-sm shadow-md transition-colors flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Descargar Tarjeta Personal (PDF)
+                  Descargar Invitación Personal (PDF)
                 </button>
               </div>
             )}
@@ -277,7 +288,6 @@ export default function RsvpForm() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate className="space-y-4 text-left">
-            {/* Honeypot invisible anti-bots */}
             <input
               type="text"
               name="website_hp"
@@ -354,47 +364,50 @@ export default function RsvpForm() {
               <InlineError message={errors.apellido} />
             </div>
 
-            {/* Campo: Menú Especial */}
-            <div>
-              <label htmlFor="dieta" className="block text-sm font-medium text-tiana-brown mb-1">
-                Menú especial
-              </label>
-              <select
-                id="dieta"
-                name="dieta"
-                value={formData.dieta}
-                onChange={handleChange}
-                className={`${getInputClass('dieta')} cursor-pointer`}
-              >
-                {OPCIONES_DIETA.map((opcion) => (
-                  <option key={opcion.value} value={opcion.value}>
-                    {opcion.label}
-                  </option>
-                ))}
-              </select>
-              <InlineError message={errors.dieta} />
-            </div>
+            {/* Campos exclusivos para quienes ASISTEN (Se ocultan cuando elige "No") */}
+            {asisteAlEvento && (
+              <div className="space-y-4 transition-all duration-300">
+                <div>
+                  <label htmlFor="dieta" className="block text-sm font-medium text-tiana-brown mb-1">
+                    Menú especial
+                  </label>
+                  <select
+                    id="dieta"
+                    name="dieta"
+                    value={formData.dieta}
+                    onChange={handleChange}
+                    className={`${getInputClass('dieta')} cursor-pointer`}
+                  >
+                    {OPCIONES_DIETA.map((opcion) => (
+                      <option key={opcion.value} value={opcion.value}>
+                        {opcion.label}
+                      </option>
+                    ))}
+                  </select>
+                  <InlineError message={errors.dieta} />
+                </div>
 
-            {/* Campo: Recomendación al DJ */}
-            <div>
-              <label htmlFor="cancion" className="block text-sm font-medium text-tiana-brown mb-1">
-                Recomendación al DJ
-              </label>
-              <input
-                id="cancion"
-                type="text"
-                name="cancion"
-                maxLength={120}
-                placeholder="Recomendale una canción al DJ 🎶"
-                value={formData.cancion}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={getInputClass('cancion')}
-              />
-              <InlineError message={errors.cancion} />
-            </div>
+                <div>
+                  <label htmlFor="cancion" className="block text-sm font-medium text-tiana-brown mb-1">
+                    Recomendación al DJ
+                  </label>
+                  <input
+                    id="cancion"
+                    type="text"
+                    name="cancion"
+                    maxLength={120}
+                    placeholder="Recomendale una canción al DJ 🎶"
+                    value={formData.cancion}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={getInputClass('cancion')}
+                  />
+                  <InlineError message={errors.cancion} />
+                </div>
+              </div>
+            )}
 
-            {/* Nuevo Apartado: Mensaje especial para la quinceañera */}
+            {/* Apartado de Mensaje para la 15añera (disponible tanto si asiste como si no) */}
             <div className="pt-2">
               <div className="p-4 rounded-xl bg-tiana-mint/25 border border-tiana-gold/40 space-y-2">
                 <div className="flex items-center justify-between">
@@ -416,7 +429,7 @@ export default function RsvpForm() {
                   name="mensaje"
                   rows="3"
                   maxLength={300}
-                  placeholder={`Ej: ¡Felices 15, ${nombreQuinceanera}! Qué alegría acompañarte en esta noche...`}
+                  placeholder={`Ej: ¡Felices 15, ${nombreQuinceanera}! Te deseo lo mejor...`}
                   value={formData.mensaje}
                   onChange={handleChange}
                   onBlur={handleBlur}

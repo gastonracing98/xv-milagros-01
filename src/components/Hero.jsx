@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart } from 'lucide-react';
 import config from '../data/eventConfig.json';
-import foto from '../../public/foto15.jpg'
+import FloralDecor from './FloralDecor';
 
 export default function Hero() {
   const { nombre, subtitulo, frase, fotoHero, fechaVisual } = config.quinceanera;
@@ -9,18 +9,66 @@ export default function Hero() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [currentTime, setCurrentTime] = useState("0:00");
+  const [currentTime, setCurrentTime] = useState('0:00');
+  const [totalDuration, setTotalDuration] = useState(duracionTexto || '0:00');
   const [progress, setProgress] = useState(0);
+
   const audioRef = useRef(null);
+  // Bandera para saber si ya arrancó sola una vez (así no molesta si el invitado la pausa)
+  const hasAutoStartedRef = useRef(false);
+
+  useEffect(() => {
+    const tryAutoPlay = () => {
+      if (hasAutoStartedRef.current || !audioRef.current) return;
+
+      audioRef.current
+        .play()
+        .then(() => {
+          hasAutoStartedRef.current = true;
+          setIsPlaying(true);
+          removeListeners();
+        })
+        .catch(() => {
+          // Si el evento fue un scroll en PC y el navegador aún pide un clic/toque,
+          // mantenemos los listeners activos hasta el primer toque o clic real.
+        });
+    };
+
+    const events = ['touchstart', 'pointerdown', 'click', 'keydown', 'scroll'];
+
+    const removeListeners = () => {
+      events.forEach((evt) => window.removeEventListener(evt, tryAutoPlay));
+    };
+
+    // Intentamos reproducir al cargar y, si el navegador lo frena, al primer toque/scroll
+    tryAutoPlay();
+    events.forEach((evt) => window.addEventListener(evt, tryAutoPlay, { passive: true }));
+
+    return () => removeListeners();
+  }, []);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
+    hasAutoStartedRef.current = true; // Si tocó el botón manualmente, respetamos su decisión
+
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
       audioRef.current.play();
+      setIsPlaying(true);
     }
-    setIsPlaying(!isPlaying);
+  };
+
+  // Calcula automáticamente la duración total cuando carga tu archivo .mp3 local
+  const handleLoadedMetadata = () => {
+    if (!audioRef.current || !audioRef.current.duration) return;
+    const duration = audioRef.current.duration;
+    if (isFinite(duration)) {
+      const mins = Math.floor(duration / 60);
+      const secs = Math.floor(duration % 60);
+      setTotalDuration(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
+    }
   };
 
   const handleTimeUpdate = () => {
@@ -36,37 +84,41 @@ export default function Hero() {
 
   return (
     <section className="bg-tiana-cream text-tiana-brown overflow-hidden">
-      {/* 1. Foto Superior con Nombre Superpuesto */}
-      <div className="relative h-[65vh] md:h-[75vh] w-full">
+      {/* 1. Contenedor de la Foto Superior */}
+      <div className="relative h-[68vh] md:h-[78vh] w-full">
         <img
           src={fotoHero}
           alt={nombre}
           onError={(e) => {
-            e.target.src = foto;
+            e.target.src = './foto15.jpg';
           }}
           className="w-full h-full object-cover object-top"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60 flex flex-col items-center justify-end pb-16 px-4">
-          <span className="text-tiana-gold tracking-[0.35em] text-xs md:text-sm font-semibold uppercase mb-2">
+
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80 flex flex-col items-center justify-end pb-28 sm:pb-32 md:pb-36 px-4 z-20">
+          <span className="text-tiana-gold tracking-[0.35em] text-xs md:text-sm font-semibold uppercase mb-2 drop-shadow">
             XV AÑOS
           </span>
-          <h1 className="text-4xl md:text-6xl font-serif tracking-[0.2em] text-tiana-pearl font-normal uppercase drop-shadow-md">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif tracking-[0.2em] text-tiana-pearl font-normal uppercase drop-shadow-lg">
             {nombre}
           </h1>
         </div>
 
-        {/* Divisor de papel rasgado / onda suave en la base de la foto */}
         <svg
-          className="absolute -bottom-1 left-0 w-full text-tiana-cream fill-current"
+          className="absolute -bottom-1 left-0 w-full h-10 sm:h-12 md:h-16 text-tiana-cream fill-current z-10"
           viewBox="0 0 1440 100"
           preserveAspectRatio="none"
         >
           <path d="M0,45 C240,95 480,10 720,55 C960,95 1200,20 1440,65 L1440,100 L0,100 Z" />
         </svg>
+
+        <div className="absolute bottom-16 left-0 right-0 translate-y-3/4 z-30 md:bottom-[-20px] md:translate-y-0">
+          <FloralDecor variant="hero-bottom" />
+        </div>
       </div>
 
-      {/* 2. Bloque de Invitación y Fecha (Sin cursivas) */}
-      <div className="max-w-lg mx-auto px-6 pt-8 pb-12 text-center relative">
+      {/* 2. Bloque de Invitación, Fecha y Canción */}
+      <div className="max-w-lg mx-auto px-6 pt-16 md:pt-20 pb-7 text-center relative z-10">
         <p className="text-xs md:text-sm uppercase tracking-[0.25em] text-tiana-brown/80 mb-3 font-medium">
           Con la bendición de Dios y de mis padres
         </p>
@@ -79,7 +131,7 @@ export default function Hero() {
           {frase}
         </p>
 
-        {/* Diseño de Fecha igual a la captura 4 */}
+        {/* Fecha con líneas horizontales */}
         <div className="flex items-center justify-center gap-4 my-6">
           <div className="flex-1 max-w-[110px] border-y border-tiana-brown/60 py-1.5">
             <span className="text-xs md:text-sm font-semibold tracking-[0.2em] uppercase text-tiana-brown">
@@ -103,23 +155,20 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* 3. Reproductor de Música (Captura 6) justo debajo de la fecha */}
-        <div className="mt-10 bg-tiana-dark/90 backdrop-blur-md text-tiana-pearl rounded-3xl p-6 shadow-xl border border-tiana-gold/30 max-w-sm mx-auto">
+        {/* Reproductor de Música */}
+        <div className="mt-10 bg-tiana-dark/95 backdrop-blur-md text-tiana-pearl rounded-3xl p-6 shadow-xl border border-tiana-gold/30 max-w-sm mx-auto">
           <audio
             ref={audioRef}
             src={audioUrl}
+            preload="auto"
+            onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={handleTimeUpdate}
             onEnded={() => setIsPlaying(false)}
           />
 
-          <h3 className="text-lg font-semibold tracking-wide text-tiana-pearl">
-            {titulo}
-          </h3>
-          <p className="text-xs text-tiana-mint tracking-wider mt-0.5 mb-5">
-            {artista}
-          </p>
+          <h3 className="text-lg font-semibold tracking-wide text-tiana-pearl">{titulo}</h3>
+          <p className="text-xs text-tiana-mint tracking-wider mt-0.5 mb-5">{artista}</p>
 
-          {/* Barra de progreso */}
           <div className="w-full bg-tiana-pearl/20 h-1 rounded-full overflow-hidden relative">
             <div
               className="bg-tiana-gold h-full transition-all duration-200"
@@ -128,10 +177,9 @@ export default function Hero() {
           </div>
           <div className="flex justify-between text-[11px] text-tiana-beige mt-1.5 font-mono">
             <span>{currentTime}</span>
-            <span>{duracionTexto}</span>
+            <span>{totalDuration}</span>
           </div>
 
-          {/* Controles del reproductor */}
           <div className="flex items-center justify-between mt-4 px-2">
             <button type="button" className="text-tiana-pearl/70 hover:text-tiana-gold transition">
               <Shuffle className="w-4 h-4" />
@@ -159,7 +207,6 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* Corazón decorativo inferior */}
         <button
           type="button"
           onClick={() => setLiked(!liked)}

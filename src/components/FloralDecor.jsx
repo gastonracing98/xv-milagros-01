@@ -18,7 +18,6 @@ export default function FloralDecor({ variant = 'corner', className = '' }) {
     e.currentTarget.style.display = 'none';
   };
 
-  // 1. Pie de la foto de la cumpleañera (Hero) - Altura controlada en mobile y desktop
   if (variant === 'hero-bottom') {
     return (
       <div className={`w-full flex justify-center pointer-events-none select-none ${className}`}>
@@ -33,7 +32,6 @@ export default function FloralDecor({ variant = 'corner', className = '' }) {
     );
   }
 
-  // 2. Costados del Cronograma (Timeline)
   if (variant === 'side-vines') {
     return (
       <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
@@ -90,7 +88,6 @@ export default function FloralDecor({ variant = 'corner', className = '' }) {
     );
   }
 
-  // 3. Imagen superior en el Formulario RSVP
   if (variant === 'form-arch') {
     return (
       <div className={`relative w-full flex justify-center pointer-events-none select-none ${className}`}>

@@ -21,7 +21,7 @@ export default function Location() {
         </div>
 
         {/* Horario y Nombre del Lugar */}
-        <h2 className="text-2xl md:text-3xl font-serif font-semibold tracking-[0.12em] text-tiana-brown uppercase mb-2">
+        <h2 className="text-1xl md:text-2xl font-serif font-semibold tracking-[0.05em] text-tiana-brown mb-2">
           {horarioYLugar}
         </h2>
         <p className="text-sm text-tiana-brown/80 mb-6">

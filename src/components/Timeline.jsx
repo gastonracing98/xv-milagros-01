@@ -16,7 +16,7 @@ export default function Timeline() {
   const items = config.cronograma;
 
   return (
-    <section className="relative py-20 px-6 bg-tiana-dark text-tiana-pearl overflow-hidden">
+    <section className="relative py-20 px-5 bg-tiana-dark text-tiana-pearl overflow-hidden">
       {/* Flores en los costados izquierdo y derecho (Captura 4) */}
       <FloralDecor variant="side-vines" />
 
@@ -33,7 +33,7 @@ export default function Timeline() {
           {/* Línea vertical continua */}
           <div className="absolute left-8 top-4 bottom-4 w-[1.5px] bg-tiana-gold/50 -translate-x-1/2" />
 
-          <div className="space-y-10">
+          <div className="space-y-4">
             {items.map((item, index) => {
               const IconComponent = iconMap[item.icono] || Sparkles;
               return (
@@ -45,7 +45,7 @@ export default function Timeline() {
 
                   {/* Punto dorado intermedio */}
                   {index < items.length - 1 && (
-                    <div className="absolute left-8 -bottom-6 w-2.5 h-2.5 rounded-full bg-tiana-gold -translate-x-1/2 z-10" />
+                    <div className="absolute left-8 -bottom-2 w-2.5 h-2.5 rounded-full bg-tiana-gold -translate-x-1/2 z-10" />
                   )}
 
                   {/* Texto del evento */}

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import config from '../data/eventConfig.json';
 import {
-  addDoc,
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  doc,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import InlineError from './InlineError';
@@ -79,14 +80,14 @@ export default function RsvpForm() {
         return '';
 
       case 'dieta':
-        if (!asisteAlEvento) return ''; // No validar si no asiste
+        if (!asisteAlEvento) return '';
         if (!OPCIONES_DIETA.some((op) => op.value === value)) {
           return 'Seleccioná una opción válida del menú.';
         }
         return '';
 
       case 'cancion':
-        if (!asisteAlEvento || !cleanValue) return ''; // No validar si no asiste o está vacío
+        if (!asisteAlEvento || !cleanValue) return '';
         if (cleanValue.length < 2) return 'El nombre de la canción es demasiado corto.';
         if (cleanValue.length > 120) return 'Máximo 120 caracteres para la recomendación.';
         if (regexCaracteresPeligrosos.test(cleanValue)) return 'El texto contiene caracteres no permitidos.';
@@ -106,7 +107,6 @@ export default function RsvpForm() {
 
   const validateForm = () => {
     const newErrors = {};
-    // Si elige "no", solo validamos nombre, apellido y mensaje
     const fieldsToValidate = asisteAlEvento
       ? ['nombre', 'apellido', 'dieta', 'cancion', 'mensaje']
       : ['nombre', 'apellido', 'mensaje'];
@@ -124,7 +124,6 @@ export default function RsvpForm() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Si cambia a "no", limpiamos posibles errores previos en dieta y canción
     if (name === 'asiste' && value === 'no') {
       setErrors((prev) => ({ ...prev, dieta: '', cancion: '', general: '' }));
     } else if (errors[name] || errors.general) {
@@ -156,6 +155,7 @@ export default function RsvpForm() {
     const mensajeSanitizado = sanitizeText(formData.mensaje);
 
     try {
+      // 1. Verificar duplicados
       const q = query(
         collection(db, 'invitados'),
         where('nombre', '==', nombreNormalizado),
@@ -172,31 +172,49 @@ export default function RsvpForm() {
         return;
       }
 
-      // Strings genéricos por defecto cuando elige "no" para compatibilidad total con Firebase
-      const nuevoInvitado = {
-        asiste: formData.asiste,
-        nombre: nombreNormalizado,
-        apellido: apellidoNormalizado,
-        dieta: asisteAlEvento ? formData.dieta : 'No aplica (No asiste)',
-        cancion: asisteAlEvento ? (cancionSanitizada || 'Sin especificar') : 'No aplica',
-        mensaje: mensajeSanitizado || 'Sin mensaje',
-        createdAt: new Date()
-      };
+      const counterRef = doc(db, 'metricas', 'embudo_rsvp');
+      const nuevoInvitadoRef = doc(collection(db, 'invitados'));
 
-      const docRef = await addDoc(collection(db, 'invitados'), nuevoInvitado);
+      const sufijoSeguridad = nuevoInvitadoRef.id.slice(0, 3).toUpperCase();
 
-      const datosParaPdf = {
-        ...nuevoInvitado,
-        idCorto: docRef.id.slice(0, 6).toUpperCase()
-      };
+      const datosRegistrados = await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        const ultimoNro = counterDoc.exists() ? (counterDoc.data().ultimoNroInvitado || 0) : 0;
+        const nuevoNro = ultimoNro + 1;
+
+        const nroFormateado = String(nuevoNro).padStart(4, '0');
+        const codigoUnico = `XV-MILU-${nroFormateado}-${sufijoSeguridad}`;
+
+        const payloadInvitado = {
+          nroRegistro: nuevoNro,
+          codigoInvitacion: codigoUnico,
+          asiste: formData.asiste,
+          nombre: nombreNormalizado,
+          apellido: apellidoNormalizado,
+          dieta: asisteAlEvento ? formData.dieta : 'No aplica (No asiste)',
+          cancion: asisteAlEvento ? (cancionSanitizada || 'Sin especificar') : 'No aplica',
+          mensaje: mensajeSanitizado || 'Sin mensaje',
+          createdAt: new Date()
+        };
+
+        
+        transaction.set(counterRef, { ultimoNroInvitado: nuevoNro }, { merge: true });
+        transaction.set(nuevoInvitadoRef, payloadInvitado);
+
+        return {
+          ...payloadInvitado,
+          idCorto: codigoUnico
+        };
+      });
 
       trackConversion('confirmacionesExitosas', {
         invitado: `${nombreNormalizado} ${apellidoNormalizado}`,
+        codigoInvitacion: datosRegistrados.codigoInvitacion,
         asiste: formData.asiste
       });
-      notifyNewRsvp(datosParaPdf);
+      notifyNewRsvp(datosRegistrados);
 
-      setGuestRegistered(datosParaPdf);
+      setGuestRegistered(datosRegistrados);
       setEnviado(true);
     } catch (err) {
       console.error('Error al guardar en Firebase:', err);
@@ -212,7 +230,8 @@ export default function RsvpForm() {
     if (!guestRegistered) return;
     await generateInvitationPdf(guestRegistered);
     trackConversion('descargasPdf', {
-      invitado: `${guestRegistered.nombre} ${guestRegistered.apellido}`
+      invitado: `${guestRegistered.nombre} ${guestRegistered.apellido}`,
+      codigoInvitacion: guestRegistered.codigoInvitacion
     });
   };
 
@@ -227,11 +246,10 @@ export default function RsvpForm() {
   return (
     <section className="relative py-16 px-6 bg-tiana-cream text-tiana-brown overflow-hidden">
       <div className="max-w-md mx-auto text-center relative z-10">
-        {/* Arco Floral Superior (Inspirado en la captura 5) */}
         <FloralDecor variant="form-arch" />
 
         <h2 className="text-2xl md:text-3xl font-serif font-semibold text-tiana-brown mb-8 tracking-wide">
-          Sólo faltas vos, ¿Venís?
+          Faltas vos, ¿Venís?
         </h2>
 
         <InlineError message={errors.general} variant="banner" />
@@ -246,9 +264,20 @@ export default function RsvpForm() {
               ¡Gracias por responder, {guestRegistered?.nombre}!
             </h3>
 
+            {guestRegistered?.asiste === 'si' && (
+              <div className="py-2 px-4 bg-tiana-mint/30 rounded-lg border border-tiana-gold/30 inline-block">
+                <span className="block text-[10px] uppercase tracking-widest text-tiana-brown/80">
+                  Tu código de invitación
+                </span>
+                <span className="font-mono text-sm font-bold text-tiana-dark tracking-wider">
+                  {guestRegistered.codigoInvitacion}
+                </span>
+              </div>
+            )}
+
             <p className="text-sm text-tiana-brown leading-relaxed">
               {guestRegistered?.asiste === 'si'
-                ? 'Tus datos fueron registrados. Descargá tu tarjeta personal con marco floral para el ingreso al salón.'
+                ? 'Tus datos fueron registrados. Descargá tu tarjeta personal con tu código único para el ingreso al salón.'
                 : 'Registramos que no podrás asistir. ¡Muchas gracias por avisarnos y por tus palabras!'}
             </p>
 
@@ -364,7 +393,7 @@ export default function RsvpForm() {
               <InlineError message={errors.apellido} />
             </div>
 
-            {/* Campos exclusivos para quienes ASISTEN (Se ocultan cuando elige "No") */}
+            {/* Campos exclusivos para quienes ASISTEN */}
             {asisteAlEvento && (
               <div className="space-y-4 transition-all duration-300">
                 <div>
@@ -407,13 +436,13 @@ export default function RsvpForm() {
               </div>
             )}
 
-            {/* Apartado de Mensaje para la 15añera (disponible tanto si asiste como si no) */}
+            {/* Apartado de Mensaje para la 15añera */}
             <div className="pt-2">
               <div className="p-4 rounded-xl bg-tiana-mint/25 border border-tiana-gold/40 space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="mensaje" className="text-sm font-semibold text-tiana-dark flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-tiana-gold" />
-                    Dejale un mensaje a {nombreQuinceanera}
+                    Dejale un mensaje a Milu ♥
                   </label>
                   <span className="text-[11px] text-tiana-brown/60 font-mono">
                     {formData.mensaje.length}/300

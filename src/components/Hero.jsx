@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Music, X } from 'lucide-react';
 import config from '../data/eventConfig.json';
 import FloralDecor from './FloralDecor';
 
@@ -8,17 +8,17 @@ export default function Hero() {
   const { titulo, artista, audioUrl, duracionTexto } = config.musica;
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showAudioPrompt, setShowAudioPrompt] = useState(true);
   const [liked, setLiked] = useState(false);
   const [currentTime, setCurrentTime] = useState('0:00');
   const [totalDuration, setTotalDuration] = useState(duracionTexto || '0:00');
   const [progress, setProgress] = useState(0);
 
   const audioRef = useRef(null);
-  // Bandera para saber si ya arrancó sola una vez (así no molesta si el invitado la pausa)
   const hasAutoStartedRef = useRef(false);
 
   useEffect(() => {
-    const tryAutoPlay = () => {
+    const startAudioOnTap = () => {
       if (hasAutoStartedRef.current || !audioRef.current) return;
 
       audioRef.current
@@ -26,30 +26,32 @@ export default function Hero() {
         .then(() => {
           hasAutoStartedRef.current = true;
           setIsPlaying(true);
+          setShowAudioPrompt(false);
           removeListeners();
         })
         .catch(() => {
-          // Si el evento fue un scroll en PC y el navegador aún pide un clic/toque,
-          // mantenemos los listeners activos hasta el primer toque o clic real.
+          // Si el navegador aún bloquea el audio, mantiene el aviso visible hasta el primer click/tap real
         });
     };
 
-    const events = ['touchstart', 'pointerdown', 'click', 'keydown', 'scroll'];
+    // 'click' cubre tanto el tap corto en celulares como el clic en escritorio
+    const events = ['click', 'keydown'];
 
     const removeListeners = () => {
-      events.forEach((evt) => window.removeEventListener(evt, tryAutoPlay));
+      events.forEach((evt) => window.removeEventListener(evt, startAudioOnTap));
     };
 
-    // Intentamos reproducir al cargar y, si el navegador lo frena, al primer toque/scroll
-    tryAutoPlay();
-    events.forEach((evt) => window.addEventListener(evt, tryAutoPlay, { passive: true }));
+    events.forEach((evt) => window.addEventListener(evt, startAudioOnTap, { passive: true }));
 
     return () => removeListeners();
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = (e) => {
+    if (e) e.stopPropagation();
     if (!audioRef.current) return;
-    hasAutoStartedRef.current = true; // Si tocó el botón manualmente, respetamos su decisión
+
+    hasAutoStartedRef.current = true;
+    setShowAudioPrompt(false);
 
     if (isPlaying) {
       audioRef.current.pause();
@@ -60,7 +62,12 @@ export default function Hero() {
     }
   };
 
-  // Calcula automáticamente la duración total cuando carga tu archivo .mp3 local
+  const handleDismissPrompt = (e) => {
+    e.stopPropagation(); // Evita que al cerrar con la X se dispare el play global
+    hasAutoStartedRef.current = true;
+    setShowAudioPrompt(false);
+  };
+
   const handleLoadedMetadata = () => {
     if (!audioRef.current || !audioRef.current.duration) return;
     const duration = audioRef.current.duration;
@@ -83,7 +90,41 @@ export default function Hero() {
   };
 
   return (
-    <section className="bg-tiana-cream text-tiana-brown overflow-hidden">
+    <section className="bg-tiana-cream text-tiana-brown overflow-hidden relative">
+      {showAudioPrompt && !isPlaying && (
+        <div className="fixed top-4 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+          <div
+            onClick={togglePlay}
+            role="button"
+            tabIndex={0}
+            className="pointer-events-auto w-full max-w-sm bg-tiana-dark/95 text-tiana-pearl px-4 py-3 rounded-2xl shadow-2xl border border-tiana-gold/60 backdrop-blur-md flex items-center justify-between gap-3 cursor-pointer animate-bounce"
+          >
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-9 h-9 rounded-full bg-tiana-gold/20 border border-tiana-gold flex items-center justify-center shrink-0 text-tiana-gold">
+                <Music className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-tiana-pearl">
+                  ¡Esta invitación tiene música! 🎶
+                </p>
+                <p className="text-[11px] text-tiana-mint leading-tight mt-0.5">
+                  Tocá la pantalla para escuchar la canción
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDismissPrompt}
+              aria-label="Cerrar aviso de música"
+              className="p-1 text-tiana-pearl/60 hover:text-tiana-pearl transition shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. Contenedor de la Foto Superior */}
       <div className="relative h-[68vh] md:h-[78vh] w-full">
         <img

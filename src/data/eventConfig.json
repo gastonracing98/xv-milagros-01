@@ -6,9 +6,9 @@
     "padres": ["Nombre del Padre", "Nombre de la Madre"],
     "frase": "Me gustaría que seas parte de esta noche mágica:",
     "fotoHero": "/foto15.jpg",
-    "fechaEvento": "2026-12-05T23:30:00Z",
+    "fechaEvento": "2026-12-04T21:30:00-03:00",
     "fechaVisual": {
-      "diaSemana": "SÁBADO",
+      "diaSemana": "VIERNES",
       "diaNumero": "04",
       "mes": "DICIEMBRE",
       "anio": "2026"
@@ -54,7 +54,7 @@
     
     {
       "hora": "00:30 HS",
-      "titulo": "ENTREGA REGALOS Y BAILE",
+      "titulo": "REGALOS Y BAILE",
       "descripcion": "¡A brillar en la pista de baile!",
       "icono": "disc"
     },

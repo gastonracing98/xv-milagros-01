@@ -2,69 +2,70 @@
   "clienteId": "xv-milagros-01",
   "quinceanera": {
     "nombre": "MILAGROS",
-    "subtitulo": "¡MIS 15 AÑOS!",
+    "subtitulo": "¡TE INVITO A FESTEJAR MIS 15 AÑOS!",
     "padres": ["Nombre del Padre", "Nombre de la Madre"],
-    "frase": "Los esperamos para celebrar juntos esta noche mágica",
-    "fotoHero": "/quince-hero.jpg",
-    "fechaEvento": "2026-12-05T23:30:00Z",
+    "frase": "Me gustaría que seas parte de esta noche mágica:",
+    "fotoHero": "/foto15.jpg",
+    "fechaEvento": "2026-12-04T21:30:00-03:00",
     "fechaVisual": {
-      "diaSemana": "SÁBADO",
+      "diaSemana": "VIERNES",
       "diaNumero": "04",
       "mes": "DICIEMBRE",
       "anio": "2026"
     }
   },
-  "musica": {
-    "titulo": "Better Together",
-    "artista": "Jack Johnson",
-    "audioUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    "duracionTexto": "3:52"
-  },
+ "musica": {
+  "titulo": "Ma Belle Evangeline",
+  "artista": "La Princesa y el Sapo",
+  "audioUrl": "/musica/cancion-milu.mp3",
+  "duracionTexto": "3:52"
+},
   "ubicacion": {
-    "horarioYLugar": "19:30HS - Vecinos de Alem",
-    "direccion": "Valentín Alsina 60, Monte Grande",
-    "mapaUrl": "https://maps.google.com/?q=Janos+La+Reja",
+    "horarioYLugar": "A las 21:30 hs en Valentín Alsina 60, Monte Grande",
+    "direccion": "",
+    "mapaUrl": "https://maps.app.goo.gl/62FPutq3U8Nfmjx1A",
     "iframeEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1299.316902974698!2d-58.46386243945019!3d-34.824094598212426!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x95bcd15f5dd4d6ab%3A0x1a6bfd968beab226!2sSociedad%20Vecinos%20de%20Alem!5e0!3m2!1ses-419!2sar!4v1793447362790!5m2!1ses-419!2sar"
   },
   "cronograma": [
     {
-      "hora": "20:30 HS",
+      "hora": "21:30 HS",
       "titulo": "RECEPCIÓN",
-      "descripcion": "Bienvenida y cóctel en los jardines del salón",
+      "descripcion": "Bienvenida con aperitivos",
       "icono": "sparkles"
     },
     {
-      "hora": "21:30 HS",
-      "titulo": "ENTRADA PRINCIPAL",
-      "descripcion": "Comienzo de una noche inolvidable",
+      "hora": "22:15 HS",
+      "titulo": "¡ENTRADA DE MILAGROS!",
+      "descripcion": "Entrega de rosas",
       "icono": "crown"
     },
     {
-      "hora": "22:00 HS",
-      "titulo": "CENA Y BRINDIS",
-      "descripcion": "Compartimos una deliciosa cena y palabras especiales",
-      "icono": "utensils"
-    },
-    {
-      "hora": "23:15 HS",
+      "hora": "22:40 HS",
       "titulo": "EL VALS",
       "descripcion": "El primer baile tradicional con familia y amigos",
       "icono": "music"
     },
     {
-      "hora": "00:00 HS",
-      "titulo": "FIESTA Y BAILE",
-      "descripcion": "¡A brillar en la pista toda la noche!",
+      "hora": "...A continuación",
+      "titulo": "CENA Y ENTREGA DE VELAS",
+      "descripcion": "Compartimos una deliciosa cena y palabras especiales",
+      "icono": "utensils"
+    },
+    
+    {
+      "hora": "00:30 HS",
+      "titulo": "REGALOS Y BAILE",
+      "descripcion": "¡A brillar en la pista de baile!",
       "icono": "disc"
     },
     {
-      "hora": "04:30 HS",
+      "hora": "04:50 HS",
       "titulo": "FIN DE FIESTA",
-      "descripcion": "Despedida y desayuno",
+      "descripcion": "Despedida! :(",
       "icono": "star"
     }
   ],
   "rsvp": {
-    "recordatorio": "RECORDÁ COMPLETAR UN FORMULARIO POR PERSONA. HACELO ANTES DEL 4 DE DICIEMBRE."
+    "recordatorio": "RECORDÁ COMPLETAR UN FORMULARIO POR PERSONA ANTES DEL 1° DE DICIEMBRE"
   }
 }

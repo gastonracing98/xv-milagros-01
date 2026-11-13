@@ -16,7 +16,6 @@ const mensajeResumen = [
 
   const promesas = [];
 
-  // 1. Notificación por Email (vía Web3Forms API gratuita)
   if (WEB3FORMS_KEY) {
     const emailPromise = fetch('https://api.web3forms.com/submit', {
       method: 'POST',
@@ -35,7 +34,6 @@ const mensajeResumen = [
     promesas.push(emailPromise);
   }
 
-  // 2. Notificación automática por WhatsApp (vía CallMeBot API)
   if (WHATSAPP_PHONE && CALLMEBOT_KEY) {
     const encodedMsg = encodeURIComponent(mensajeResumen);
     const waUrl = `https://api.callmebot.com/whatsapp.php?phone=${WHATSAPP_PHONE}&text=${encodedMsg}&apikey=${CALLMEBOT_KEY}`;

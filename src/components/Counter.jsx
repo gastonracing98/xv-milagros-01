@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import config from '../data/eventConfig.json';
+import FloralDecor from './FloralDecor'
 
 export default function Counter() {
   const targetDateStr = config.quinceanera.fechaEvento;
@@ -43,8 +44,11 @@ export default function Counter() {
   ];
 
   return (
-    <section className="py-14 px-4 bg-tiana-mint/40 text-tiana-brown flex flex-col items-center justify-center border-y border-tiana-gold/20">
-      <div className="text-center mb-8">
+<section className="relative overflow-hidden py-16 px-4 bg-tiana-mint/40 text-tiana-brown flex flex-col items-center justify-center border-y border-tiana-gold/20">
+      <FloralDecor className="absolute -top-6 -left-8 opacity-80 -rotate-12" />
+      <FloralDecor className="absolute -bottom-6 -right-8 opacity-80 rotate-12" />
+
+      <div className="text-center mb-8 relative z-10">
         <h2 className="font-serif text-tiana-dark text-xs md:text-sm tracking-[0.3em] uppercase font-semibold mb-2">
           La Cuenta Regresiva
         </h2>

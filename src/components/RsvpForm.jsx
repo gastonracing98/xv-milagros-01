@@ -12,9 +12,11 @@ import { db } from '../services/firebase';
 import InlineError from './InlineError';
 import FloralDecor from './FloralDecor';
 import { trackPageVisit, trackSubmitClick, trackConversion } from '../services/analytics';
+// Importamos ambas funciones de generación desde services según tu estructura
+import { generateInvitationPdf, generateInvitationJPG } from '../services/pdfGenerator';
 import { notifyNewRsvp } from '../services/notifications';
-import { generateInvitationPdf } from '../services/pdfGenerator';
-import { Download, CheckCircle2, Sparkles } from 'lucide-react';
+// Agregamos ImageIcon y FileText para los botones
+import { Download, CheckCircle2, Sparkles, Image as ImageIcon, FileText } from 'lucide-react';
 
 const OPCIONES_DIETA = [
   { value: 'Ninguno (Menú general)', label: 'Ninguno (Menú general)' },
@@ -55,8 +57,16 @@ export default function RsvpForm() {
   const nombreQuinceanera = config?.quinceanera?.nombre || 'la quinceañera';
   const asisteAlEvento = formData.asiste === 'si';
 
+  // AL CARGAR LA PÁGINA: Recuperar si alguien ya se registró
   useEffect(() => {
     trackPageVisit();
+    
+    // Verificar si hay un invitado guardado en el navegador
+    const guardado = localStorage.getItem('invitadoRegistrado');
+    if (guardado) {
+      setGuestRegistered(JSON.parse(guardado));
+      setEnviado(true);
+    }
   }, []);
 
   const validateField = (name, value) => {
@@ -137,7 +147,7 @@ export default function RsvpForm() {
     if (errorMsg) setErrors((prev) => ({ ...prev, [name]: errorMsg }));
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (formData.website_hp) return;
@@ -172,12 +182,15 @@ export default function RsvpForm() {
         return;
       }
 
+      // La referencia del contador la podemos buscar fuera
       const counterRef = doc(db, 'metricas', 'embudo_rsvp');
-      const nuevoInvitadoRef = doc(collection(db, 'invitados'));
-
-      const sufijoSeguridad = nuevoInvitadoRef.id.slice(0, 3).toUpperCase();
 
       const datosRegistrados = await runTransaction(db, async (transaction) => {
+        // CORRECCIÓN 1: Generar el nuevo doc ADENTRO de la transacción
+        // Así, si Firestore necesita reintentar por mala conexión, genera un ID fresco sin chocar.
+        const nuevoInvitadoRef = doc(collection(db, 'invitados'));
+        const sufijoSeguridad = nuevoInvitadoRef.id.slice(0, 3).toUpperCase();
+
         const counterDoc = await transaction.get(counterRef);
         const ultimoNro = counterDoc.exists() ? (counterDoc.data().ultimoNroInvitado || 0) : 0;
         const nuevoNro = ultimoNro + 1;
@@ -196,9 +209,15 @@ export default function RsvpForm() {
           mensaje: mensajeSanitizado || 'Sin mensaje',
           createdAt: new Date()
         };
-
         
-        transaction.set(counterRef, { ultimoNroInvitado: nuevoNro }, { merge: true });
+        // CORRECCIÓN 2: No usar { merge: true }. Usar update vs set.
+        // Esto elimina el error "failed-precondition" de cuajo.
+        if (counterDoc.exists()) {
+          transaction.update(counterRef, { ultimoNroInvitado: nuevoNro });
+        } else {
+          transaction.set(counterRef, { ultimoNroInvitado: nuevoNro });
+        }
+        
         transaction.set(nuevoInvitadoRef, payloadInvitado);
 
         return {
@@ -216,6 +235,9 @@ export default function RsvpForm() {
 
       setGuestRegistered(datosRegistrados);
       setEnviado(true);
+
+      localStorage.setItem('invitadoRegistrado', JSON.stringify(datosRegistrados));
+
     } catch (err) {
       console.error('Error al guardar en Firebase:', err);
       setErrors({
@@ -226,6 +248,7 @@ export default function RsvpForm() {
     }
   };
 
+  // Funciones de descarga independientes
   const handleDownloadPdf = async () => {
     if (!guestRegistered) return;
     await generateInvitationPdf(guestRegistered);
@@ -233,6 +256,32 @@ export default function RsvpForm() {
       invitado: `${guestRegistered.nombre} ${guestRegistered.apellido}`,
       codigoInvitacion: guestRegistered.codigoInvitacion
     });
+  };
+
+  const handleDownloadJPG = async () => {
+    if (!guestRegistered) return;
+    await generateInvitationJPG(guestRegistered);
+    trackConversion('descargasJPG', { // Trackeamos también el JPG
+      invitado: `${guestRegistered.nombre} ${guestRegistered.apellido}`,
+      codigoInvitacion: guestRegistered.codigoInvitacion
+    });
+  };
+
+  // Función para resetear la vista y limpiar el LocalStorage
+  const handleResetForm = () => {
+    setEnviado(false);
+    setGuestRegistered(null);
+    setErrors({});
+    setFormData({
+      asiste: 'si',
+      nombre: '',
+      apellido: '',
+      dieta: OPCIONES_DIETA[0].value,
+      cancion: '',
+      mensaje: '',
+      website_hp: ''
+    });
+    localStorage.removeItem('invitadoRegistrado'); // LIMPIAMOS LA SESIÓN
   };
 
   const getInputClass = (fieldName) => {
@@ -275,42 +324,43 @@ export default function RsvpForm() {
               </div>
             )}
 
-            <p className="text-sm text-tiana-brown leading-relaxed">
+            <p className="text-sm text-tiana-brown leading-relaxed mb-4">
               {guestRegistered?.asiste === 'si'
                 ? 'Tus datos fueron registrados. Descargá tu tarjeta personal con tu código único para el ingreso al salón.'
                 : 'Registramos que no podrás asistir. ¡Muchas gracias por avisarnos y por tus palabras!'}
             </p>
 
+            {/* BOTONES DE DESCARGA */}
             {guestRegistered?.asiste === 'si' && (
-              <div className="pt-2">
+              <div className="pt-2 flex flex-col gap-3 w-full">
+                
+                {/* Botón JPG (Principal) */}
+                <button
+                  type="button"
+                  onClick={handleDownloadJPG}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-full bg-tiana-dark hover:bg-tiana-primary text-tiana-pearl font-semibold tracking-[0.15em] uppercase text-xs md:text-sm shadow-md transition-colors"
+                >
+                  <ImageIcon className="w-5 h-5 shrink-0" />
+                  Descargar Imagen (JPG)
+                </button>
+
+                {/* Botón PDF (Secundario) */}
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
-                  className="w-full py-3.5 px-6 rounded-full bg-tiana-dark hover:bg-tiana-primary text-tiana-pearl font-semibold tracking-[0.15em] uppercase text-xs md:text-sm shadow-md transition-colors flex items-center justify-center gap-2"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-transparent border-2 border-tiana-dark text-tiana-dark font-semibold tracking-[0.15em] uppercase text-xs hover:bg-tiana-dark/10 transition-colors"
                 >
-                  <Download className="w-4 h-4" />
-                  Descargar Invitación Personal (PDF)
+                  <FileText className="w-4 h-4 shrink-0" />
+                  Descargar PDF
                 </button>
+                
               </div>
             )}
 
             <button
               type="button"
-              onClick={() => {
-                setEnviado(false);
-                setGuestRegistered(null);
-                setErrors({});
-                setFormData({
-                  asiste: 'si',
-                  nombre: '',
-                  apellido: '',
-                  dieta: OPCIONES_DIETA[0].value,
-                  cancion: '',
-                  mensaje: '',
-                  website_hp: ''
-                });
-              }}
-              className="block w-full pt-4 text-xs uppercase tracking-widest text-tiana-brown/80 hover:text-tiana-dark underline font-semibold"
+              onClick={handleResetForm}
+              className="block w-full pt-6 text-xs uppercase tracking-widest text-tiana-brown/80 hover:text-tiana-dark underline font-semibold decoration-dotted underline-offset-4"
             >
               Cargar otra persona
             </button>

@@ -1,22 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Heart, Music, X } from 'lucide-react';
+import { Play, Pause, Music, X } from 'lucide-react';
 import config from '../data/eventConfig.json';
 import FloralDecor from './FloralDecor';
 
 export default function Hero() {
   const { nombre, subtitulo, frase, fotoHero, fechaVisual } = config.quinceanera;
-  const { titulo, artista, audioUrl, duracionTexto } = config.musica;
+  const { audioUrl } = config.musica;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showAudioPrompt, setShowAudioPrompt] = useState(true);
-  const [liked, setLiked] = useState(false);
-  const [currentTime, setCurrentTime] = useState('0:00');
-  const [totalDuration, setTotalDuration] = useState(duracionTexto || '0:00');
-  const [progress, setProgress] = useState(0);
+  const [isBubble, setIsBubble] = useState(false);
+  
+  // Estado para arrastrar la burbuja
+  const [bubblePos, setBubblePos] = useState({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
 
   const audioRef = useRef(null);
   const hasAutoStartedRef = useRef(false);
+  
+  // Referencia para controlar YouTube
+  const ytPlayerRef = useRef(null);
 
+  // 1. Reproducción global al primer toque
   useEffect(() => {
     const startAudioOnTap = () => {
       if (hasAutoStartedRef.current || !audioRef.current) return;
@@ -27,24 +33,84 @@ export default function Hero() {
           hasAutoStartedRef.current = true;
           setIsPlaying(true);
           setShowAudioPrompt(false);
+          setIsBubble(true);
           removeListeners();
         })
-        .catch(() => {
-          // Si el navegador aún bloquea el audio, mantiene el aviso visible hasta el primer click/tap real
-        });
+        .catch(() => {});
     };
 
-    // 'click' cubre tanto el tap corto en celulares como el clic en escritorio
-    const events = ['click', 'keydown'];
-
+    const events = ['click', 'keydown', 'touchstart'];
     const removeListeners = () => {
       events.forEach((evt) => window.removeEventListener(evt, startAudioOnTap));
     };
 
     events.forEach((evt) => window.addEventListener(evt, startAudioOnTap, { passive: true }));
-
     return () => removeListeners();
   }, []);
+
+  // 2. Inicializar YouTube API para el control cruzado (Música / Video)
+  useEffect(() => {
+    let player;
+
+    const initPlayer = () => {
+      // Usamos el ID del iframe para conectarlo
+      player = new window.YT.Player('youtube-player', {
+        events: {
+          onStateChange: (event) => {
+            // Estado 1 = REPRODUCIENDO (PLAYING)
+            if (event.data === 1) {
+              if (audioRef.current && !audioRef.current.paused) {
+                audioRef.current.pause();
+                setIsPlaying(false);
+              }
+            }
+          },
+        },
+      });
+      ytPlayerRef.current = player;
+    };
+
+    // Inyectar el script de YouTube si no existe en la página
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      window.onYouTubeIframeAPIReady = initPlayer;
+    } else if (window.YT && window.YT.Player) {
+      initPlayer();
+    }
+
+    return () => {
+      if (player && typeof player.destroy === 'function') {
+        player.destroy();
+      }
+    };
+  }, []);
+
+  // Lógica de arrastre (Drag & Drop)
+  const handlePointerDown = (e) => {
+    if (!isBubble) return;
+    isDragging.current = true;
+    dragOffset.current = {
+      x: e.clientX - bubblePos.x,
+      y: e.clientY - bubblePos.y,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging.current) return;
+    setBubblePos({
+      x: e.clientX - dragOffset.current.x,
+      y: e.clientY - dragOffset.current.y,
+    });
+  };
+
+  const handlePointerUp = (e) => {
+    isDragging.current = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
 
   const togglePlay = (e) => {
     if (e) e.stopPropagation();
@@ -59,46 +125,46 @@ export default function Hero() {
     } else {
       audioRef.current.play();
       setIsPlaying(true);
+      // Pausar YouTube si la música de fondo se vuelve a activar
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.pauseVideo === 'function') {
+        ytPlayerRef.current.pauseVideo();
+      }
     }
   };
 
   const handleDismissPrompt = (e) => {
-    e.stopPropagation(); // Evita que al cerrar con la X se dispare el play global
+    e.stopPropagation();
     hasAutoStartedRef.current = true;
     setShowAudioPrompt(false);
-  };
-
-  const handleLoadedMetadata = () => {
-    if (!audioRef.current || !audioRef.current.duration) return;
-    const duration = audioRef.current.duration;
-    if (isFinite(duration)) {
-      const mins = Math.floor(duration / 60);
-      const secs = Math.floor(duration % 60);
-      setTotalDuration(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const current = audioRef.current.currentTime;
-    const duration = audioRef.current.duration || 1;
-    setProgress((current / duration) * 100);
-
-    const mins = Math.floor(current / 60);
-    const secs = Math.floor(current % 60);
-    setCurrentTime(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
+    setIsBubble(true);
   };
 
   return (
     <section className="bg-tiana-cream text-tiana-brown overflow-hidden relative">
-      {showAudioPrompt && !isPlaying && (
-        <div className="fixed top-4 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
-          <div
-            onClick={togglePlay}
-            role="button"
-            tabIndex={0}
-            className="pointer-events-auto w-full max-w-sm bg-tiana-dark/95 text-tiana-pearl px-4 py-3 rounded-2xl shadow-2xl border border-tiana-gold/60 backdrop-blur-md flex items-center justify-between gap-3 cursor-pointer animate-bounce"
-          >
+      
+      <style>{`
+        @keyframes eq {
+          0%, 100% { transform: scaleY(0.3); }
+          50% { transform: scaleY(1); }
+        }
+        .eq-bar {
+          transform-origin: bottom;
+          animation: eq 1s infinite ease-in-out;
+        }
+      `}</style>
+
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        preload="auto"
+        loop
+        onEnded={() => setIsPlaying(false)}
+      />
+
+      {/* NOTIFICACIÓN INICIAL */}
+      {showAudioPrompt && !isBubble && (
+        <div className="fixed top-4 inset-x-0 z-[60] flex justify-center px-4 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-sm bg-tiana-dark/95 text-tiana-pearl px-4 py-3 rounded-2xl shadow-2xl border border-tiana-gold/60 backdrop-blur-md flex items-center justify-between gap-3 animate-bounce">
             <div className="flex items-center gap-3 text-left">
               <div className="w-9 h-9 rounded-full bg-tiana-gold/20 border border-tiana-gold flex items-center justify-center shrink-0 text-tiana-gold">
                 <Music className="w-4 h-4" />
@@ -108,16 +174,13 @@ export default function Hero() {
                   ¡Esta invitación tiene música! 🎶
                 </p>
                 <p className="text-[11px] text-tiana-mint leading-tight mt-0.5">
-                  Tocá la pantalla para escuchar la canción
+                  Tocá cualquier parte de la pantalla para escucharla
                 </p>
               </div>
             </div>
-
             <button
-              type="button"
               onClick={handleDismissPrompt}
-              aria-label="Cerrar aviso de música"
-              className="p-1 text-tiana-pearl/60 hover:text-tiana-pearl transition shrink-0"
+              className="p-1 text-tiana-pearl/60 hover:text-tiana-pearl transition shrink-0 z-50"
             >
               <X className="w-4 h-4" />
             </button>
@@ -125,18 +188,49 @@ export default function Hero() {
         </div>
       )}
 
-      {/* 1. Contenedor de la Foto Superior */}
-      <div className="relative h-[68vh] md:h-[78vh] w-full">
+      {/* BURBUJA FLOTANTE COMPRIMIDA (Dynamic Island) */}
+      {isBubble && (
+        <div
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          style={{
+            transform: `translate(${bubblePos.x}px, ${bubblePos.y}px)`,
+            touchAction: 'none'
+          }}
+          className="fixed bottom-6 right-6 z-[60] cursor-grab active:cursor-grabbing flex justify-end"
+        >
+          <div 
+            onClick={togglePlay}
+            className={`h-14 rounded-full bg-tiana-dark border border-tiana-gold/80 shadow-[0_8px_16px_rgba(0,0,0,0.4)] backdrop-blur-md flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden ${
+              isPlaying ? 'w-24 px-4' : 'w-14'
+            }`}
+          >
+            {isPlaying ? (
+              <div className="flex items-end justify-center gap-[4px] h-6 w-full pb-1">
+                <div className="w-[4px] h-full bg-tiana-mint rounded-full eq-bar" style={{ animationDuration: '0.7s' }}></div>
+                <div className="w-[4px] h-full bg-tiana-gold rounded-full eq-bar" style={{ animationDuration: '1.1s' }}></div>
+                <div className="w-[4px] h-full bg-tiana-mint rounded-full eq-bar" style={{ animationDuration: '0.8s' }}></div>
+                <div className="w-[4px] h-full bg-tiana-gold rounded-full eq-bar" style={{ animationDuration: '1s' }}></div>
+                <div className="w-[4px] h-full bg-tiana-mint rounded-full eq-bar" style={{ animationDuration: '1.2s' }}></div>
+              </div>
+            ) : (
+              <Play className="w-6 h-6 fill-tiana-gold text-tiana-gold ml-1 transition-transform" />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 1. Contenedor EXCLUSIVO de la Foto Superior */}
+      <div className="relative h-[68vh] md:h-[78vh] w-full bg-tiana-dark">
         <img
           src={fotoHero}
           alt={nombre}
-          onError={(e) => {
-            e.target.src = './foto15.jpg';
-          }}
           className="w-full h-full object-cover object-top"
         />
 
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80 flex flex-col items-center justify-end pb-28 sm:pb-32 md:pb-36 px-4 z-20">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80 flex flex-col items-center justify-end pb-24 sm:pb-28 md:pb-32 px-4 z-20 pointer-events-none">
           <span className="text-tiana-gold tracking-[0.35em] text-xs md:text-sm font-semibold uppercase mb-2 drop-shadow">
             XV AÑOS
           </span>
@@ -144,117 +238,87 @@ export default function Hero() {
             {nombre}
           </h1>
         </div>
+      </div>
 
-        <svg
-          className="absolute -bottom-1 left-0 w-full h-10 sm:h-12 md:h-16 text-tiana-cream fill-current z-10"
-          viewBox="0 0 1440 100"
+      {/* 2. NUEVO SEPARADOR ESTRUCTURAL */}
+      <div className="relative w-full bg-tiana-cream z-30">
+        
+        <svg 
+          className="absolute left-0 w-full h-12 sm:h-16 md:h-24 text-tiana-cream fill-current z-10 pointer-events-none" 
+          style={{ bottom: '100%', marginBottom: '-2px' }} 
+          viewBox="0 0 1440 100" 
           preserveAspectRatio="none"
         >
           <path d="M0,45 C240,95 480,10 720,55 C960,95 1200,20 1440,65 L1440,100 L0,100 Z" />
         </svg>
-
-        <div className="absolute bottom-16 left-0 right-0 translate-y-3/4 z-30 md:bottom-[-20px] md:translate-y-0">
+        
+        <div className="absolute left-0 right-0 flex justify-center z-30 pointer-events-none" style={{ bottom: '100%', transform: 'translateY(55%)' }}>
           <FloralDecor variant="hero-bottom" />
         </div>
-      </div>
 
-      {/* 2. Bloque de Invitación, Fecha y Canción */}
-      <div className="max-w-lg mx-auto px-6 pt-16 md:pt-20 pb-7 text-center relative z-10">
-        <p className="text-xs md:text-sm uppercase tracking-[0.25em] text-tiana-brown/80 mb-3 font-medium">
-          Con la bendición de Dios y de mis padres
-        </p>
+        {/* 3. Bloque de Invitación y Fecha */}
+        <div className="max-w-lg mx-auto px-6 pt-16 md:pt-20 pb-4 text-center relative z-20">
+          <p className="text-xs md:text-sm uppercase tracking-[0.25em] text-tiana-brown/80 mb-3 font-medium">
+            Con la bendición de Dios y de mis padres
+          </p>
+          <h2 className="text-2xl md:text-3xl font-serif font-semibold text-tiana-dark tracking-[0.15em] uppercase my-6">
+            {subtitulo}
+          </h2>
+          <p className="text-sm md:text-base text-tiana-brown max-w-xs mx-auto mb-8 leading-relaxed font-normal">
+            {frase}
+          </p>
 
-        <h2 className="text-2xl md:text-3xl font-serif font-semibold text-tiana-dark tracking-[0.15em] uppercase my-6">
-          {subtitulo}
-        </h2>
-
-        <p className="text-sm md:text-base text-tiana-brown max-w-xs mx-auto mb-8 leading-relaxed font-normal">
-          {frase}
-        </p>
-
-        {/* Fecha con líneas horizontales */}
-        <div className="flex items-center justify-center gap-4 my-6">
-          <div className="flex-1 max-w-[110px] border-y border-tiana-brown/60 py-1.5">
-            <span className="text-xs md:text-sm font-semibold tracking-[0.2em] uppercase text-tiana-brown">
-              {fechaVisual.diaSemana}
-            </span>
-          </div>
-
-          <div className="flex flex-col items-center px-2">
-            <span className="text-5xl md:text-6xl font-serif font-bold text-tiana-dark leading-none">
-              {fechaVisual.diaNumero}
-            </span>
-            <span className="text-xs tracking-[0.25em] text-tiana-brown mt-1 font-semibold">
-              {fechaVisual.anio}
-            </span>
-          </div>
-
-          <div className="flex-1 max-w-[110px] border-y border-tiana-brown/60 py-1.5">
-            <span className="text-xs md:text-sm font-semibold tracking-[0.2em] uppercase text-tiana-brown">
-              {fechaVisual.mes}
-            </span>
+          <div className="flex items-center justify-center gap-4 my-6">
+            <div className="flex-1 max-w-[110px] border-y border-tiana-brown/60 py-1.5">
+              <span className="text-xs md:text-sm font-semibold tracking-[0.2em] uppercase text-tiana-brown">
+                {fechaVisual.diaSemana}
+              </span>
+            </div>
+            <div className="flex flex-col items-center px-2">
+              <span className="text-5xl md:text-6xl font-serif font-bold text-tiana-dark leading-none">
+                {fechaVisual.diaNumero}
+              </span>
+              <span className="text-xs tracking-[0.25em] text-tiana-brown mt-1 font-semibold">
+                {fechaVisual.anio}
+              </span>
+            </div>
+            <div className="flex-1 max-w-[110px] border-y border-tiana-brown/60 py-1.5">
+              <span className="text-xs md:text-sm font-semibold tracking-[0.2em] uppercase text-tiana-brown">
+                {fechaVisual.mes}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Reproductor de Música */}
-        <div className="mt-10 bg-tiana-dark/95 backdrop-blur-md text-tiana-pearl rounded-3xl p-6 shadow-xl border border-tiana-gold/30 max-w-sm mx-auto">
-          <audio
-            ref={audioRef}
-            src={audioUrl}
-            preload="auto"
-            onLoadedMetadata={handleLoadedMetadata}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={() => setIsPlaying(false)}
-          />
-
-          <h3 className="text-lg font-semibold tracking-wide text-tiana-pearl">{titulo}</h3>
-          <p className="text-xs text-tiana-mint tracking-wider mt-0.5 mb-5">{artista}</p>
-
-          <div className="w-full bg-tiana-pearl/20 h-1 rounded-full overflow-hidden relative">
-            <div
-              className="bg-tiana-gold h-full transition-all duration-200"
-              style={{ width: `${progress}%` }}
+        {/* 4. Contenedor del Video de YouTube */}
+        <div className="max-w-lg mx-auto px-6 pb-16 text-center relative z-40 pointer-events-auto">
+          <h3 className="text-2xl md:text-3xl font-serif font-bold text-tiana-dark tracking-[0.1em] uppercase mb-8 mt-4">
+            Mi vida en un video
+          </h3>
+          
+          <div className="relative mx-auto w-full max-w-sm rounded-xl p-1.5 bg-gradient-to-br from-tiana-mint/40 to-tiana-gold/20 border-2 border-tiana-gold/50 shadow-[0_10px_25px_rgba(0,0,0,0.15)] pointer-events-auto">
+            
+            {/* FLOR MODIFICADA: Z-index muy alto [60], tamaño más grande (w-32) y más hacia adentro (-top-5 -left-5) */}
+            <img 
+              src="/flores/MarcoEsquina.png"
+              alt="Decoración floral" 
+              className="absolute -top-8 -left-8 w-32 h-32 z-[60] drop-shadow-[0_4px_8px_rgba(0,0,0,0.4)] pointer-events-none"
+              onError={(e) => e.target.style.display = 'none'} 
             />
-          </div>
-          <div className="flex justify-between text-[11px] text-tiana-beige mt-1.5 font-mono">
-            <span>{currentTime}</span>
-            <span>{totalDuration}</span>
-          </div>
 
-          <div className="flex items-center justify-between mt-4 px-2">
-            <button type="button" className="text-tiana-pearl/70 hover:text-tiana-gold transition">
-              <Shuffle className="w-4 h-4" />
-            </button>
-            <button type="button" className="text-tiana-pearl hover:text-tiana-gold transition">
-              <SkipBack className="w-5 h-5 fill-current" />
-            </button>
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="w-14 h-14 rounded-full bg-tiana-pearl text-tiana-dark flex items-center justify-center shadow-md hover:scale-105 transition-transform"
-            >
-              {isPlaying ? (
-                <Pause className="w-6 h-6 fill-current" />
-              ) : (
-                <Play className="w-6 h-6 fill-current ml-0.5" />
-              )}
-            </button>
-            <button type="button" className="text-tiana-pearl hover:text-tiana-gold transition">
-              <SkipForward className="w-5 h-5 fill-current" />
-            </button>
-            <button type="button" className="text-tiana-pearl/70 hover:text-tiana-gold transition">
-              <Repeat className="w-4 h-4" />
-            </button>
+            <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black z-50 pointer-events-auto">
+              <iframe
+                id="youtube-player"
+                src="https://www.youtube.com/embed/P3bgCqMzC5E?enablejsapi=1&modestbranding=1&rel=0&iv_load_policy=3"
+                frameBorder="0"
+                allow="autoplay; fullscreen; picture-in-picture"
+                className="absolute top-0 left-0 w-full h-full pointer-events-auto"
+                title="Mi vida en un video"
+              ></iframe>
+            </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setLiked(!liked)}
-          className="mt-4 inline-flex items-center justify-center text-tiana-brown/70 hover:text-tiana-gold transition"
-        >
-          <Heart className={`w-5 h-5 ${liked ? 'fill-tiana-gold text-tiana-gold' : ''}`} />
-        </button>
       </div>
     </section>
   );

@@ -300,7 +300,7 @@ export default function Hero() {
             
             {/* FLOR MODIFICADA: Z-index muy alto [60], tamaño más grande (w-32) y más hacia adentro (-top-5 -left-5) */}
             <img 
-              src="../../public/flores/MarcoEsquina.png" 
+              src="/flores/MarcoEsquina.png"
               alt="Decoración floral" 
               className="absolute -top-8 -left-8 w-32 h-32 z-[60] drop-shadow-[0_4px_8px_rgba(0,0,0,0.4)] pointer-events-none"
               onError={(e) => e.target.style.display = 'none'} 
